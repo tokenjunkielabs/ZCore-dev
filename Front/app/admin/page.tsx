@@ -26,7 +26,9 @@ export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false)
   const [adminKeyInput, setAdminKeyInput] = useState("")
   const [loading, setLoading] = useState(false)
+  const [actionId, setActionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [platforms, setPlatforms] = useState<AdminPlatform[]>([])
   const [lenders, setLenders] = useState<AdminLender[]>([])
   const [events, setEvents] = useState<AdminEvent[]>([])
@@ -83,6 +85,7 @@ export default function AdminPage() {
   const handleRegisterPlatform = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
+    setNotice(null)
     setLastRegisteredKey(null)
 
     const result = await adminClient.registerPlatform({
@@ -98,6 +101,59 @@ export default function AdminPage() {
 
     setLastRegisteredKey(result.data?.apiKey ?? null)
     setRegisterForm({ platformId: "", name: "", webhookUrl: "" })
+    loadDashboard()
+  }
+
+  const handleDispute = async (event: AdminEvent) => {
+    const reason = window.prompt("Reason for disputing this credit event?")?.trim()
+    if (!reason) return
+
+    setActionId(`dispute-${event.id}`)
+    setError(null)
+    setNotice(null)
+    const result = await adminClient.disputeEvent(event.id, reason)
+    setActionId(null)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setNotice("Event disputed. Recalculate the wallet to apply the score change.")
+    loadDashboard()
+  }
+
+  const handleReinstate = async (event: AdminEvent) => {
+    setActionId(`reinstate-${event.id}`)
+    setError(null)
+    setNotice(null)
+    const result = await adminClient.reinstateEvent(event.id)
+    setActionId(null)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setNotice("Event reinstated. Recalculate the wallet to apply the score change.")
+    loadDashboard()
+  }
+
+  const handleRecalculate = async (event: AdminEvent) => {
+    setActionId(`recalc-${event.id}`)
+    setError(null)
+    setNotice(null)
+    const result = await adminClient.recalculateUser(event.walletAddress)
+    setActionId(null)
+
+    if (result.error) {
+      setError(result.error)
+      return
+    }
+
+    setNotice(
+      `Recalculated ${event.walletAddress.slice(0, 8)}...: ${result.data?.previousScore} -> ${result.data?.score}`
+    )
     loadDashboard()
   }
 
@@ -142,7 +198,7 @@ export default function AdminPage() {
           <p className="section-label mb-2">Operator</p>
           <h1 className="page-title mb-2">Admin Dashboard</h1>
           <p className="page-subtitle">
-            Manage platforms, lenders, and monitor recent credit events.
+            Manage platforms, lenders, and disputed credit events.
           </p>
         </div>
 
@@ -150,6 +206,12 @@ export default function AdminPage() {
           <Alert variant="destructive" className="border-red-500/30 bg-red-500/10">
             <XCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {notice && (
+          <Alert className="border-white/10 bg-white/[0.03]">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>{notice}</AlertDescription>
           </Alert>
         )}
 
@@ -212,8 +274,12 @@ export default function AdminPage() {
             </form>
             {lastRegisteredKey && (
               <div className="mt-4 border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-[10px] uppercase tracking-zk-wide text-white/30 mb-1">New API key — save it now</p>
-                <p className="text-xs font-mono text-white/70 break-all select-all">{lastRegisteredKey}</p>
+                <p className="text-[10px] uppercase tracking-zk-wide text-white/30 mb-1">
+                  New API key - save it now
+                </p>
+                <p className="text-xs font-mono text-white/70 break-all select-all">
+                  {lastRegisteredKey}
+                </p>
               </div>
             )}
           </CardContent>
@@ -284,6 +350,9 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Recent events ({events.length})</CardTitle>
+                <CardDescription>
+                  Dispute or reinstate an event, then recalculate that wallet.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -293,6 +362,8 @@ export default function AdminPage() {
                       <TableHead>Platform</TableHead>
                       <TableHead>Wallet</TableHead>
                       <TableHead>Impact</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -305,17 +376,46 @@ export default function AdminPage() {
                         <TableCell className="text-xs font-mono">
                           {event.walletAddress.slice(0, 8)}...
                         </TableCell>
-                        <TableCell
-                          className={`text-xs tabular-nums font-bold ${
-                            event.scoreImpact > 0
-                              ? "text-white/70"
-                              : event.scoreImpact < 0
-                              ? "text-white/35"
-                              : "text-white/20"
-                          }`}
-                        >
+                        <TableCell className="text-xs tabular-nums font-bold">
                           {event.scoreImpact > 0 ? "+" : ""}
                           {event.scoreImpact}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {event.disputed ? (
+                            <span title={event.disputeReason ?? undefined}>disputed</span>
+                          ) : (
+                            "active"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {event.disputed ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionId === `reinstate-${event.id}`}
+                                onClick={() => handleReinstate(event)}
+                              >
+                                Reinstate
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actionId === `dispute-${event.id}`}
+                                onClick={() => handleDispute(event)}
+                              >
+                                Dispute
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              disabled={actionId === `recalc-${event.id}`}
+                              onClick={() => handleRecalculate(event)}
+                            >
+                              Recalculate
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
