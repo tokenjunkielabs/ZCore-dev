@@ -47,6 +47,10 @@ model CreditEvent {
   scoreImpact        Int
   verifiedAt         DateTime
   createdAt          DateTime @default(now())
+  disputed           Boolean  @default(false)
+  disputeReason      String?
+  disputedAt         DateTime?
+  disputedBy         String?
   user               User     @relation(fields: [userId], references: [id])
   platform           Platform @relation(fields: [platformId], references: [id])
 
