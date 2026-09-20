@@ -14,4 +14,18 @@ describe("score-recalc.service", () => {
     expect(result.eventsTotal).toBe(35);
     expect(result.paymentsTotal).toBe(-20);
   });
+
+  it("excludes disputed credit events from score impact", () => {
+    const result = recalculateUserScore({
+      stellarBase: 120,
+      creditEvents: [
+        { scoreImpact: 50, disputed: true },
+        { scoreImpact: 25, disputed: false },
+      ],
+      payments: [],
+    });
+
+    expect(result.score).toBe(145);
+    expect(result.eventsTotal).toBe(25);
+  });
 });
