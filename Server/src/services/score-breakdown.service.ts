@@ -20,6 +20,7 @@ export async function buildScoreBreakdown(
     where: { walletAddress },
     include: {
       creditEvents: {
+        where: { disputed: false },
         select: { platformId: true, scoreImpact: true },
       },
     },
