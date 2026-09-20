@@ -29,6 +29,20 @@ export interface AdminEvent {
   scoreImpact: number
   txHash: string
   createdAt: string
+  disputed: boolean
+  disputeReason: string | null
+  disputedAt: string | null
+  disputedBy: string | null
+}
+
+export interface AdminRecalcResult {
+  walletAddress: string
+  previousScore: number
+  score: number
+  profileTier: string
+  stellarBase: number
+  eventsTotal: number
+  paymentsTotal: number
 }
 
 class AdminClient {
@@ -99,6 +113,30 @@ class AdminClient {
       events: AdminEvent[]
       pagination: { limit: number; offset: number; total: number }
     }>(`/api/admin/events/recent?limit=${limit}&offset=${offset}`)
+  }
+
+  disputeEvent(id: string, reason: string) {
+    return this.request<{ event: AdminEvent }>(
+      `/api/admin/events/${encodeURIComponent(id)}/dispute`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }
+    )
+  }
+
+  reinstateEvent(id: string) {
+    return this.request<{ event: AdminEvent }>(
+      `/api/admin/events/${encodeURIComponent(id)}/reinstate`,
+      { method: "POST" }
+    )
+  }
+
+  recalculateUser(wallet: string) {
+    return this.request<AdminRecalcResult>(
+      `/api/admin/users/${encodeURIComponent(wallet)}/recalculate`,
+      { method: "POST" }
+    )
   }
 
   registerPlatform(payload: {
