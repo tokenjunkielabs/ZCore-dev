@@ -52,7 +52,7 @@ async function main() {
   const users = await prisma.user.findMany({
     where: options.wallet ? { walletAddress: options.wallet } : undefined,
     include: {
-      creditEvents: { select: { scoreImpact: true } },
+      creditEvents: { select: { scoreImpact: true, disputed: true } },
       payments: { select: { status: true } },
     },
   });
@@ -65,7 +65,7 @@ async function main() {
   console.log(
     options.apply
       ? "Applying score recalculation..."
-      : "Dry run — no database writes"
+      : "Dry run - no database writes"
   );
 
   for (const user of users) {
