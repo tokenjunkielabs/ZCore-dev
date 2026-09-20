@@ -7,7 +7,7 @@ import type { StellarWalletData } from "./stellar.service";
 
 export interface RecalcInput {
   stellarBase: number;
-  creditEvents: { scoreImpact: number }[];
+  creditEvents: { scoreImpact: number; disputed?: boolean }[];
   payments: { status: string }[];
 }
 
@@ -41,7 +41,7 @@ export function computeStellarBaseFromStoredData(
 
 export function recalculateUserScore(input: RecalcInput): RecalcResult {
   const eventsTotal = input.creditEvents.reduce(
-    (sum, event) => sum + event.scoreImpact,
+    (sum, event) => (event.disputed ? sum : sum + event.scoreImpact),
     0
   );
   const paymentsTotal = input.payments.reduce((sum, payment) => {
